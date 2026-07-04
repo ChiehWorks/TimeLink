@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>時刻通 - 任務管理</title>
+    <!-- 載入 LINE 原生 LIFF SDK -->
     <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <style>
         body {
@@ -60,7 +61,7 @@
         /* 主畫面容器 */
         .container {
             padding: 20px;
-            padding-bottom: 80px; /* 預留底部空間 */
+            padding-bottom: 80px;
         }
         .header {
             text-align: center;
@@ -70,7 +71,7 @@
             margin-bottom: 20px;
         }
 
-        /* 任務清單卡片 */
+        /* 任務清單卡片 (全新優化排版) */
         #taskList {
             display: flex;
             flex-direction: column;
@@ -83,11 +84,34 @@
             box-shadow: 0 2px 8px rgba(0,0,0,0.05);
             position: relative;
         }
-        .task-time {
-            font-size: 24px;
+        
+        /* 1. 任務內容升級為主標題 */
+        .task-content-title {
+            font-size: 18px;
             font-weight: bold;
             color: #111;
-            margin-bottom: 4px;
+            line-height: 1.4;
+            margin-bottom: 12px;
+            word-break: break-all;
+        }
+        
+        /* 2. 時間與屬性降級為膠囊資訊 */
+        .task-meta {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+        .meta-item {
+            display: flex;
+            align-items: center;
+            background-color: #f5f6f8;
+            color: #555;
+            font-size: 13px;
+            padding: 4px 10px;
+            border-radius: 8px;
+            font-weight: 500;
         }
         .task-badge {
             display: inline-block;
@@ -96,26 +120,15 @@
             font-size: 12px;
             padding: 4px 8px;
             border-radius: 6px;
-            margin-left: 8px;
-            vertical-align: middle;
+            font-weight: bold;
         }
-        .task-date {
-            font-size: 13px;
-            color: #888;
-            margin-bottom: 10px;
-        }
-        .task-content {
-            font-size: 15px;
-            color: #444;
-            line-height: 1.4;
-            margin-bottom: 15px;
-            word-break: break-all;
-        }
+
+        /* 操作按鈕 */
         .task-actions {
             display: flex;
             gap: 10px;
-            border-top: 1px solid #eee;
-            padding-top: 12px;
+            border-top: 1px dashed #eaeaea;
+            padding-top: 14px;
         }
         .btn-edit, .btn-delete {
             flex: 1;
@@ -152,7 +165,7 @@
             background-color: rgba(0,0,0,0.5);
             display: flex;
             justify-content: center;
-            align-items: flex-end; /* 底部彈出 */
+            align-items: flex-end;
             z-index: 999;
             opacity: 0;
             pointer-events: none;
@@ -200,7 +213,8 @@
     <div class="container">
         <div class="header">我的提醒任務</div>
         <div id="taskList">
-            </div>
+            <!-- 任務卡片動態塞入 -->
+        </div>
     </div>
 
     <div id="editModal">
@@ -240,20 +254,16 @@
     </div>
 
     <script>
-        // --- 核心系統變數 ---
-        // 請確保這是您新的 LIFF ID (針對「任務管理」頁面)
         const LIFF_ID = "2010547461-Yeb2WkyQ"; 
         
-        // 稍後我們要去 n8n 建立的三個 Webhook 端點
         const BASE_WEBHOOK_URL = "https://chiehworks-n8n.zeabur.app/webhook";
         const API_GET_TASKS = `${BASE_WEBHOOK_URL}/liff-get-tasks`;
         const API_UPDATE_TASK = `${BASE_WEBHOOK_URL}/liff-update-task`;
         const API_DELETE_TASK = `${BASE_WEBHOOK_URL}/liff-delete-task`;
         
         let userLineId = "";
-        let currentTasks = []; // 快取當前載入的任務資料
+        let currentTasks = []; 
 
-        // --- 週期與日期欄位連動 ---
         document.getElementById('editCycle').addEventListener('change', function() {
             const dateGroup = document.getElementById('editDateGroup');
             const targetDate = document.getElementById('editDate');
@@ -266,7 +276,6 @@
             }
         });
 
-        // --- 初始化 LIFF ---
         async function initializeLiff() {
             try {
                 await liff.init({ liffId: LIFF_ID });
@@ -284,15 +293,12 @@
             }
         }
 
-        // --- 取得任務清單 ---
         async function fetchTasks() {
             try {
-                // 向 n8n 發送 GET 請求，網址帶上使用者 ID
                 const response = await fetch(`${API_GET_TASKS}?lineId=${userLineId}`);
                 if (response.ok) {
                     currentTasks = await response.json();
                     renderTasks();
-                    // 資料載入完成，隱藏呼吸燈
                     document.getElementById('loadingScreen').classList.add('fade-out');
                 } else {
                     throw new Error("API 回應異常");
@@ -302,10 +308,10 @@
             }
         }
 
-        // --- 渲染任務卡片 ---
+        // --- 全新渲染邏輯 ---
         function renderTasks() {
             const listContainer = document.getElementById('taskList');
-            listContainer.innerHTML = ''; // 清空現有列表
+            listContainer.innerHTML = ''; 
 
             if (currentTasks.length === 0) {
                 listContainer.innerHTML = '<div class="empty-state">您目前沒有任何排程任務喔！</div>';
@@ -314,16 +320,16 @@
 
             currentTasks.forEach(task => {
                 const isSingle = task.Cycle_Type === '單次';
-                const dateDisplay = isSingle && task.Target_Date ? `<div class="task-date">📅 執行日期：${task.Target_Date}</div>` : '';
+                const dateDisplay = isSingle && task.Target_Date ? `<span class="meta-item">📅 ${task.Target_Date}</span>` : '';
                 
                 const cardHtml = `
                     <div class="task-card" id="task-${task.Id}">
-                        <div class="task-time">
-                            ${task.Target_Time}
+                        <div class="task-content-title">${task.Message_Content}</div>
+                        <div class="task-meta">
+                            <span class="meta-item">⏰ ${task.Target_Time}</span>
+                            ${dateDisplay}
                             <span class="task-badge">${task.Cycle_Type}</span>
                         </div>
-                        ${dateDisplay}
-                        <div class="task-content">${task.Message_Content}</div>
                         <div class="task-actions">
                             <button class="btn-edit" onclick="openEditModal(${task.Id})">✎ 編輯</button>
                             <button class="btn-delete" onclick="deleteTask(${task.Id})">🗑️ 刪除</button>
@@ -334,11 +340,9 @@
             });
         }
 
-        // --- 刪除任務 ---
         async function deleteTask(taskId) {
             if (!confirm("確定要刪除這個提醒任務嗎？")) return;
             
-            // UI 樂觀更新：先隱藏卡片，若失敗再復原
             const card = document.getElementById(`task-${taskId}`);
             card.style.opacity = '0.5';
 
@@ -350,7 +354,6 @@
                 });
 
                 if (response.ok) {
-                    // 成功後將資料從陣列中移除並重新渲染
                     currentTasks = currentTasks.filter(t => t.Id !== taskId);
                     renderTasks();
                 } else {
@@ -363,12 +366,10 @@
             }
         }
 
-        // --- 開啟編輯彈窗 ---
         function openEditModal(taskId) {
             const task = currentTasks.find(t => t.Id === taskId);
             if (!task) return;
 
-            // 將舊資料帶入表單
             document.getElementById('editTaskId').value = task.Id;
             document.getElementById('editTime').value = task.Target_Time;
             document.getElementById('editCycle').value = task.Cycle_Type;
@@ -389,12 +390,10 @@
             document.getElementById('editModal').classList.add('active');
         }
 
-        // --- 關閉編輯彈窗 ---
         function closeModal() {
             document.getElementById('editModal').classList.remove('active');
         }
 
-        // --- 提交儲存修改 ---
         document.getElementById('editForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             
@@ -404,7 +403,7 @@
 
             const payload = {
                 taskId: document.getElementById('editTaskId').value,
-                Line_ID: userLineId, // 傳遞 Line_ID 作為安全驗證
+                Line_ID: userLineId, 
                 Target_Time: document.getElementById('editTime').value,
                 Cycle_Type: document.getElementById('editCycle').value,
                 Target_Date: document.getElementById('editDate').value || null,
@@ -421,7 +420,6 @@
                 if (response.ok) {
                     alert("更新成功！");
                     closeModal();
-                    // 重新抓取最新資料並渲染
                     await fetchTasks();
                 } else {
                     alert("更新失敗，請稍後再試。");
@@ -434,7 +432,6 @@
             }
         });
 
-        // 啟動程式
         initializeLiff();
     </script>
 </body>

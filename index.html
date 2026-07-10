@@ -123,96 +123,109 @@
     </div>
 
     <script>
-        // 系統核心變數
-        const LIFF_ID = "2010547461-E7FB0Y7d";
-        const WEBHOOK_URL = "https://chiehworks-n8n.zeabur.app/webhook/liff-register";
-        let userLineId = "";
+// 系統核心變數
+const LIFF_ID = "2010547461-E7FB0Y7d";
+// 1. 這是「背景自動註冊」要打的網址
+const REGISTER_WEBHOOK = "https://chiehworks-n8n.zeabur.app/webhook/liff-register";
+// 2. 這是「表單送出」要打的網址 (請替換為您真正負責處理『新增任務』的 n8n Webhook 網址)
+const CREATE_TASK_WEBHOOK = "https://chiehworks-n8n.zeabur.app/webhook/create-task"; 
+let userLineId = "";
 
-        // 畫面邏輯控制：根據週期類型自動顯示/隱藏「日期」欄位
-        document.getElementById('cycleType').addEventListener('change', function() {
-            const dateGroup = document.getElementById('dateGroup');
-            const targetDate = document.getElementById('targetDate');
-            if (this.value === '單次') {
-                dateGroup.classList.remove('hidden');
-                targetDate.required = true;
-            } else {
-                dateGroup.classList.add('hidden');
-                targetDate.required = false;
-                targetDate.value = ''; // 若為每天/上班日，直接清空日期資料避免後端誤判
-            }
-        });
+// 畫面邏輯控制：根據週期類型自動顯示/隱藏「日期」欄位
+document.getElementById('cycleType').addEventListener('change', function() {
+    const dateGroup = document.getElementById('dateGroup');
+    const targetDate = document.getElementById('targetDate');
+    if (this.value === '單次') {
+        dateGroup.classList.remove('hidden');
+        targetDate.required = true;
+    } else {
+        dateGroup.classList.add('hidden');
+        targetDate.required = false;
+        targetDate.value = ''; 
+    }
+});
 
-        // 初始化 LIFF 並取得使用者身分
-        async function initializeLiff() {
-            try {
-                await liff.init({ liffId: LIFF_ID });
-                if (!liff.isLoggedIn()) {
-                    liff.login();
-                } else {
-                    const profile = await liff.getProfile();
-                    userLineId = profile.userId;
-                    
-                    // 授權成功，隱藏載入文字，顯示表單
-                    document.getElementById('loading').classList.add('hidden');
-                    document.getElementById('taskForm').classList.remove('hidden');
-                    
-                    // 防呆設計：自動將「提醒日期」預設填入為「今天」
-                    const today = new Date();
-                    const yyyy = today.getFullYear();
-                    const mm = String(today.getMonth() + 1).padStart(2, '0');
-                    const dd = String(today.getDate()).padStart(2, '0');
-                    document.getElementById('targetDate').value = `${yyyy}-${mm}-${dd}`;
-                }
-            } catch (err) {
-                document.getElementById('loading').innerText = "系統初始化失敗，請確認網路狀態或重新開啟。";
-            }
-        }
-
-        // 表單送出至 n8n Webhook
-        document.getElementById('taskForm').addEventListener('submit', async function(e) {
-            e.preventDefault(); // 阻止網頁預設的重載行為
+// 初始化 LIFF 並取得使用者身分
+async function initializeLiff() {
+    try {
+        await liff.init({ liffId: LIFF_ID });
+        if (!liff.isLoggedIn()) {
+            liff.login();
+        } else {
+            const profile = await liff.getProfile();
+            userLineId = profile.userId;
             
-            // 按鈕防呆，防止連點兩次建立重複任務
-            const submitBtn = document.getElementById('submitBtn');
-            submitBtn.disabled = true;
-            submitBtn.innerText = "資料傳送中...";
+            // 授權成功，隱藏載入文字，顯示表單
+            document.getElementById('loading').classList.add('hidden');
+            document.getElementById('taskForm').classList.remove('hidden');
+            
+            // 防呆設計：自動將「提醒日期」預設填入為「今天」
+            const today = new Date();
+            const yyyy = today.getFullYear();
+            const mm = String(today.getMonth() + 1).padStart(2, '0');
+            const dd = String(today.getDate()).padStart(2, '0');
+            document.getElementById('targetDate').value = `${yyyy}-${mm}-${dd}`;
 
-            // 打包準備送給 n8n 的 JSON 資料
-            const payload = {
-                Line_ID: userLineId,
-                Target_Time: document.getElementById('targetTime').value,
-                Cycle_Type: document.getElementById('cycleType').value.split(' ')[0], // 過濾掉括號內的說明文字
-                Target_Date: document.getElementById('targetDate').value || null,
-                Target_Days: null, // 保留給進階擴充用
-                Message_Content: document.getElementById('messageContent').value
-            };
+            // 🚀 【關鍵修復】網頁載入瞬間，立刻在背景無感發送「註冊/登入」請求給 n8n
+            fetch(REGISTER_WEBHOOK, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    Line_ID: profile.userId,
+                    displayName: profile.displayName,
+                    pictureUrl: profile.pictureUrl
+                })
+            }).catch(err => console.log("背景註冊管線未通，但不影響前端畫面", err));
+            // -----------------------------------------------------------
+        }
+    } catch (err) {
+        document.getElementById('loading').innerText = "系統初始化失敗，請確認網路狀態或重新開啟。";
+    }
+}
 
-            try {
-                const response = await fetch(WEBHOOK_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
+// 表單送出至 n8n Webhook (負責處理真實的任務建立)
+document.getElementById('taskForm').addEventListener('submit', async function(e) {
+    e.preventDefault(); 
+    
+    const submitBtn = document.getElementById('submitBtn');
+    submitBtn.disabled = true;
+    submitBtn.innerText = "資料傳送中...";
 
-                if (response.ok) {
-                    // 呼叫 LINE 原生提示視窗，並自動關閉 LIFF 返回聊天室
-                    window.alert("任務建立成功！");
-                    liff.closeWindow(); 
-                } else {
-                    const result = await response.json();
-                    window.alert("建立失敗：" + (result.message || "系統異常"));
-                    submitBtn.disabled = false;
-                    submitBtn.innerText = "建立任務";
-                }
-            } catch (err) {
-                window.alert("網路連線異常，請確認伺服器狀態。");
-                submitBtn.disabled = false;
-                submitBtn.innerText = "建立任務";
-            }
+    // 打包準備送給「任務建立」工作流的 JSON 資料
+    const payload = {
+        Line_ID: userLineId,
+        Target_Time: document.getElementById('targetTime').value,
+        Cycle_Type: document.getElementById('cycleType').value.split(' ')[0], 
+        Target_Date: document.getElementById('targetDate').value || null,
+        Message_Content: document.getElementById('messageContent').value
+    };
+
+    try {
+        // 🚀 注意：這裡改打 CREATE_TASK_WEBHOOK，不要再打給註冊了
+        const response = await fetch(CREATE_TASK_WEBHOOK, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
         });
 
-        // 網頁載入後立即啟動 LIFF
-        initializeLiff();
+        if (response.ok) {
+            window.alert("任務建立成功！");
+            liff.closeWindow(); 
+        } else {
+            const result = await response.json();
+            window.alert("建立失敗：" + (result.message || "系統異常"));
+            submitBtn.disabled = false;
+            submitBtn.innerText = "建立任務";
+        }
+    } catch (err) {
+        window.alert("網路連線異常，請確認伺服器狀態。");
+        submitBtn.disabled = false;
+        submitBtn.innerText = "建立任務";
+    }
+});
+
+// 網頁載入後立即啟動 LIFF
+initializeLiff();
     </script>
 </body>
 </html>

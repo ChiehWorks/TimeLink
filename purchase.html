@@ -382,7 +382,7 @@
                 return;
             }
 
-            loadingStatus.innerText = "安全連線建立中，準備跳轉綠界...";
+            loadingStatus.innerText = "安全連線建立中，準備跳轉外部瀏覽器...";
             loadingScreen.classList.remove('fade-out');
 
             // 結帳時，依據新舊戶身分計算真正要存入的點數
@@ -396,7 +396,22 @@
             setTimeout(() => {
                 // 將最終點數一併傳給 n8n，請確保 n8n 的 ecpay-checkout 會接收 Points_To_Add
                 const checkoutUrl = `${N8N_CHECKOUT_URL}?Amount=${amount}&Line_ID=${encodeURIComponent(userId)}&Points_To_Add=${finalPoints}`;
-                window.location.href = checkoutUrl;
+                
+                // 核心修正：判斷並使用 liff.openWindow 強制喚醒系統外部預設瀏覽器
+                if (liff.isApiAvailable('openWindow')) {
+                    liff.openWindow({
+                        url: checkoutUrl,
+                        external: true // 關鍵：強制跳出 LINE 內部瀏覽器，確保金流與 3D 驗證暢通
+                    });
+                    
+                    // 外部開啟後，將原本 LIFF 內的 Loading 畫面關閉，避免用戶切回 LINE 時畫面卡住
+                    setTimeout(() => {
+                        loadingScreen.classList.add('fade-out');
+                    }, 1000);
+                } else {
+                    // 若不在 LIFF 環境或不支援 API 的降級方案
+                    window.location.href = checkoutUrl;
+                }
             }, 600);
         }
 

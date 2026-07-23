@@ -297,10 +297,10 @@
     <script>
         const N8N_CHECKOUT_URL = 'https://chiehworks-n8n.zeabur.app/webhook/ecpay-checkout';
         const N8N_BALANCE_URL = 'https://chiehworks-n8n.zeabur.app/webhook/get-points-log';
-        const LIFF_ID = '2010547461-t13I5a8y'; // ⚠️ 請記得確認填寫
+        const LIFF_ID = '2010547461-t13I5a8y'; 
 
         let userId = '';
-        let isNewUser = true; // 預設為新戶，等待後端 API 覆寫
+        let isNewUser = true; 
 
         const textBalance = document.getElementById('text-balance');
         const loadingScreen = document.getElementById('loadingScreen');
@@ -335,12 +335,10 @@
                 if (result.status === 'success' && result.data) {
                     textBalance.innerText = result.data.balance || '0';
                     
-                    // 接收後端判定的新舊戶身分
                     if (result.data.hasOwnProperty('is_new_user')) {
                         isNewUser = result.data.is_new_user;
                     }
                     
-                    // 如果是老客，執行介面變更邏輯
                     if (!isNewUser) {
                         updateUIForOldUser();
                     }
@@ -354,22 +352,14 @@
             }
         }
 
-        // 老客戶介面變更邏輯 (最佳化重構)
         function updateUIForOldUser() {
             const oldPoints = [33, 150, 500];
 
-            // 運用原生迴圈快速遍歷三個方案，節省程式碼並提高執行效率
             for (let i = 1; i <= 3; i++) {
-                // 1. 隱藏加碼標籤
                 document.getElementById(`tag-${i}`).classList.add('hidden-tag');
-                
-                // 2. 隱藏「基本 XX 點」的冗餘文字
                 document.getElementById(`base-${i}`).classList.add('hidden-tag');
-                
-                // 3. 隱藏「共」字首，讓排版更純粹
                 document.getElementById(`prefix-${i}`).style.display = 'none';
 
-                // 4. 替換總點數為基本盤，並改變顏色降低侵略性
                 const totalSpan = document.getElementById(`total-${i}`);
                 totalSpan.innerText = oldPoints[i - 1];
                 totalSpan.classList.add('total-old-user');
@@ -385,7 +375,6 @@
             loadingStatus.innerText = "安全連線建立中，準備跳轉外部瀏覽器...";
             loadingScreen.classList.remove('fade-out');
 
-            // 結帳時，依據新舊戶身分計算真正要存入的點數
             let finalPoints = basePoints;
             if (isNewUser) {
                 if (amount === 99) finalPoints = 50;
@@ -393,31 +382,30 @@
                 if (amount === 499) finalPoints = 600;
             }
 
-            const checkoutUrl = `${N8N_CHECKOUT_URL}?Amount=${amount}&Line_ID=${encodeURIComponent(userId)}&Points_To_Add=${finalPoints}`;
+            // 🌟 終極殺手鐧：加入 openExternalBrowser=1，強迫 LINE 在底層攔截並交接給外部系統瀏覽器
+            const checkoutUrl = `${N8N_CHECKOUT_URL}?Amount=${amount}&Line_ID=${encodeURIComponent(userId)}&Points_To_Add=${finalPoints}&openExternalBrowser=1`;
             
             try {
-                // 核心修正：移除 setTimeout，在點擊瞬間直接執行跳轉，避免被手機安全機制攔截
+                // 雙管齊下：同時發送 LIFF 外開指令與帶有參數的網址
                 if (liff.isApiAvailable('openWindow')) {
                     liff.openWindow({
                         url: checkoutUrl,
-                        external: true // 強制跳出 LINE 內部瀏覽器
+                        external: true 
                     });
-                    
-                    // 外部開啟後，將原本 LIFF 內的 Loading 畫面關閉
-                    setTimeout(() => {
-                        loadingScreen.classList.add('fade-out');
-                        loadingStatus.innerText = "連線授權中..."; // 重置文字
-                    }, 1500);
                 } else {
-                    // 若不在 LIFF 環境或不支援 API 的降級方案
-                    window.location.href = checkoutUrl;
+                    window.location.href = checkoutUrl; 
                 }
+
+                // 外部開啟後，將原本 LIFF 內的 Loading 畫面關閉
+                setTimeout(() => {
+                    loadingScreen.classList.add('fade-out');
+                    loadingStatus.innerText = "連線授權中..."; 
+                }, 1500);
             } catch (error) {
                 console.error("跳轉失敗", error);
                 window.location.href = checkoutUrl;
             }
 
-            // 終極防呆機制：如果 3 秒後畫面依然卡住（少數極端阻擋環境），提供手動點擊按鈕
             setTimeout(() => {
                 loadingStatus.innerHTML = `跳轉似乎被手機阻擋了。<br><br><a href="${checkoutUrl}" target="_blank" style="color: #06C755; text-decoration: underline; font-size: 18px; padding: 10px; display: inline-block;">👉 請點擊這裡手動前往結帳</a>`;
             }, 3000);

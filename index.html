@@ -38,8 +38,13 @@
             font-size: 15px;
             color: #555;
         }
+        
+        /* 統一所有輸入框的基礎設定，加入 display: block 與 margin: 0 清除 iOS 預設干擾 */
         input[type="time"], input[type="date"], select, textarea {
+            display: block;
             width: 100%;
+            max-width: 100%;
+            margin: 0;
             padding: 12px;
             border: 1px solid #ddd;
             border-radius: 8px;
@@ -47,6 +52,13 @@
             font-size: 16px; /* 避免 iOS 點擊輸入框時自動放大畫面 */
             background-color: #fafafa;
         }
+        
+        /* 針對 iOS 的 date 與 time 進行強制重置，剝離原生渲染外觀 */
+        input[type="time"], input[type="date"] {
+            -webkit-appearance: none;
+            appearance: none;
+        }
+
         input:focus, select:focus, textarea:focus {
             outline: none;
             border-color: #06C755;

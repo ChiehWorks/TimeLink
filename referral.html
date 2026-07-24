@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>時刻通 TimeLink</title>
+    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <style>
+        body { font-family: -apple-system, sans-serif; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; margin: 0; background-color: #ffffff; }
+        .brand-logo { 
+            width: 120px; 
+            height: auto;
+            margin-bottom: 20px;
+            animation: breathe 2s ease-in-out infinite; 
+        }
+        @keyframes breathe { 
+            0% { opacity: 0.6; transform: scale(0.95); }
+            50% { opacity: 1.0; transform: scale(1.05); }
+            100% { opacity: 0.6; transform: scale(0.95); }
+        }
+        .status-text { color: #1DB446; font-size: 16px; font-weight: bold; letter-spacing: 1px; }
+    </style>
+</head>
+<body>
+    <!-- 請將 src 替換為時刻通的 Logo URL -->
+    <img src="timelink-logo.png" class="brand-logo" id="loader" alt="時刻通 Logo">
+    <div id="status" class="status-text">安全驗證中...</div>
+
+    <script>
+        // ==========================================
+        const LIFF_ID = 'YOUR_LIFF_ID_HERE'; // 替換為此中轉網頁的 LIFF ID
+        const N8N_WEBHOOK_URL = 'https://chiehworks-n8n.zeabur.app/webhook/timelink-referral'; 
+        const LINE_BOT_URL = 'https://line.me/R/ti/p/@YOUR_BOT_ID'; // 替換為時刻通官方帳號
+        // ==========================================
+
+        const params = new URLSearchParams(window.location.search);
+        const REF_CODE = params.get('ref') || 'none';
+
+        async function main() {
+            try {
+                await liff.init({ liffId: LIFF_ID });
+                if (!liff.isLoggedIn()) {
+                    liff.login();
+                    return;
+                }
+
+                if (REF_CODE !== 'none') {
+                    const profile = await liff.getProfile();
+                    await fetch(N8N_WEBHOOK_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            Line_ID: profile.userId,
+                            Display_Name: profile.displayName,
+                            Picture_Url: profile.pictureUrl,
+                            Invited_By: REF_CODE
+                        })
+                    });
+                }
+                document.getElementById('status').innerText = '準備跳轉...';
+                window.location.href = LINE_BOT_URL;
+
+            } catch (error) {
+                document.getElementById('status').innerHTML = '🔴 系統異常，請稍後再試。';
+                document.getElementById('loader').style.display = 'none';
+                console.error(error);
+            }
+        }
+        window.addEventListener('load', main);
+    </script>
+</body>
+</html>

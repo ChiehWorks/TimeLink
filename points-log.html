@@ -116,7 +116,7 @@
             color: #555; 
         }
         
-        /* 🚀 關鍵修復區：統一所有輸入框的基礎設定，清除 iOS 預設干擾 */
+        /* 🚀 關鍵修復區：統一所有輸入框的基礎設定，清除 iOS 預設干擾並加入 min-height 防止塌陷 */
         input[type="month"], select {
             display: block;
             width: 100%;
@@ -129,6 +129,7 @@
             font-size: 16px; 
             background-color: #fafafa;
             color: #333;
+            min-height: 48px;
         }
         
         /* 🚀 關鍵修復區：針對 iOS 的 month 進行強制重置，剝離原生渲染外觀 */
